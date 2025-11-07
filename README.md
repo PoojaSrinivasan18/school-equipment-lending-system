@@ -1,1 +1,1 @@
-# -school-equipment-lending-system
+# school-equipment-lending-system
