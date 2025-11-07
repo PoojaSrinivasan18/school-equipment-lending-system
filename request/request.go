@@ -1,9 +1,9 @@
 package request
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"school-equipment-lending-system/database"
 )
 
 type Request struct {
@@ -17,69 +17,81 @@ type Request struct {
 	Remarks     string `json:"remarks"`
 }
 
-var Requests []Request
+// GET all requests
+func GetAllRequests(c *gin.Context) {
+	var request []Request
+	if err := database.GetDB().Find(&request).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, request)
+}
+
+// GET request by ID
+func GetRequestByID(c *gin.Context) {
+	id := c.Param("id")
+	var request Request
+	if err := database.GetDB().First(&request, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "request not found"})
+		return
+	}
+	c.JSON(http.StatusOK, request)
+}
+
+// POST new request
+func CreateRequest(c *gin.Context) {
+	var request Request
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := database.GetDB().Create(&request).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, request)
+}
+
+// PUT update request
+func UpdateRequest(c *gin.Context) {
+	id := c.Param("id")
+	var request Request
+
+	db := database.GetDB()
+	if err := db.First(&request, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "Request not found"})
+		return
+	}
+
+	var updated Request
+	if err := c.BindJSON(&updated); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db.Model(&request).Updates(updated)
+	c.JSON(http.StatusOK, request)
+}
+
+// DELETE request
+func DeleteRequest(c *gin.Context) {
+	id := c.Param("id")
+	db := database.GetDB()
+	if err := db.Delete(&Request{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Request deleted"})
+}
 
 func RegisterRequestRoutes(r *gin.Engine) {
 	requestRoutes := r.Group("/requests")
 	{
-		// GET all requests
-		requestRoutes.GET("/", func(c *gin.Context) {
-			c.JSON(http.StatusOK, Requests)
-		})
-
-		// GET request by ID
-		requestRoutes.GET("/:id", func(c *gin.Context) {
-			id := c.Param("id")
-			for _, req := range Requests {
-				if fmt.Sprint(req.RequestId) == id {
-					c.JSON(http.StatusOK, req)
-					return
-				}
-			}
-			c.JSON(http.StatusNotFound, gin.H{"message": "Request not found"})
-		})
-
-		// POST create new request
-		requestRoutes.POST("/", func(c *gin.Context) {
-			var newRequest Request
-			if err := c.BindJSON(&newRequest); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-			Requests = append(Requests, newRequest)
-			c.JSON(http.StatusCreated, newRequest)
-		})
-
-		// PUT update request
-		requestRoutes.PUT("/:id", func(c *gin.Context) {
-			id := c.Param("id")
-			var updated Request
-			if err := c.BindJSON(&updated); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-
-			for i, req := range Requests {
-				if fmt.Sprint(req.RequestId) == id {
-					Requests[i] = updated
-					c.JSON(http.StatusOK, updated)
-					return
-				}
-			}
-			c.JSON(http.StatusNotFound, gin.H{"message": "Request not found"})
-		})
-
-		// DELETE request
-		requestRoutes.DELETE("/:id", func(c *gin.Context) {
-			id := c.Param("id")
-			for i, req := range Requests {
-				if fmt.Sprint(req.RequestId) == id {
-					Requests = append(Requests[:i], Requests[i+1:]...)
-					c.JSON(http.StatusOK, gin.H{"message": "Request deleted"})
-					return
-				}
-			}
-			c.JSON(http.StatusNotFound, gin.H{"message": "Request not found"})
-		})
+		requestRoutes.GET("/", GetAllRequests)
+		requestRoutes.GET("/:id", GetRequestByID)
+		requestRoutes.POST("/", CreateRequest)
+		requestRoutes.PUT("/:id", UpdateRequest)
+		requestRoutes.DELETE("/:id", DeleteRequest)
 	}
 }
