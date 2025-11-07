@@ -1,9 +1,9 @@
 package user
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"school-equipment-lending-system/database"
 )
 
 type User struct {
@@ -15,76 +15,82 @@ type User struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
-var Users []User
+// GET all users
+func GetAllUsers(c *gin.Context) {
+	var user []User
+	if err := database.GetDB().Find(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
+
+// GET user by ID
+func GetUserByID(c *gin.Context) {
+	id := c.Param("id")
+	var user User
+	if err := database.GetDB().First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "user not found"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
+
+// POST new user
+func CreateUser(c *gin.Context) {
+	var user User
+	if err := c.BindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := database.GetDB().Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, user)
+}
+
+// PUT update request
+func UpdateUser(c *gin.Context) {
+	id := c.Param("id")
+	var user User
+
+	db := database.GetDB()
+	if err := db.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
+		return
+	}
+
+	var updated User
+	if err := c.BindJSON(&updated); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db.Model(&user).Updates(updated)
+	c.JSON(http.StatusOK, user)
+}
+
+// DELETE request
+func DeleteUser(c *gin.Context) {
+	id := c.Param("id")
+	db := database.GetDB()
+	if err := db.Delete(&User{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
+}
 
 func RegisterUserRoutes(r *gin.Engine) {
 	userRoutes := r.Group("/users")
 	{
-		// Get all users
-		userRoutes.GET("/", func(c *gin.Context) {
-			c.JSON(http.StatusOK, Users)
-		})
+		userRoutes.GET("/", GetAllUsers)
+		userRoutes.GET("/id", GetAllUsers)
+		userRoutes.POST("/", CreateUser)
+		userRoutes.PUT("/id", UpdateUser)
+		userRoutes.DELETE("/id", DeleteUser)
 
-		// Get user by ID
-		userRoutes.GET("/:id", func(c *gin.Context) {
-			idParam := c.Param("id")
-
-			for _, user := range Users {
-				if fmt.Sprint(user.ID) == idParam {
-					c.JSON(http.StatusOK, user)
-					return
-				}
-			}
-
-			c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
-		})
-
-		// Create user
-		userRoutes.POST("/", func(c *gin.Context) {
-			var newUser User
-			if err := c.BindJSON(&newUser); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-
-			Users = append(Users, newUser)
-			c.JSON(http.StatusCreated, newUser)
-		})
-
-		// Update user
-		userRoutes.PUT("/:id", func(c *gin.Context) {
-			idParam := c.Param("id")
-			var updatedUser User
-
-			if err := c.BindJSON(&updatedUser); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-
-			for i, user := range Users {
-				if fmt.Sprint(user.ID) == idParam {
-					Users[i] = updatedUser
-					c.JSON(http.StatusOK, updatedUser)
-					return
-				}
-			}
-
-			c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
-		})
-
-		// Delete user
-		userRoutes.DELETE("/:id", func(c *gin.Context) {
-			idParam := c.Param("id")
-
-			for i, user := range Users {
-				if fmt.Sprint(user.ID) == idParam {
-					Users = append(Users[:i], Users[i+1:]...)
-					c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
-					return
-				}
-			}
-
-			c.JSON(http.StatusNotFound, gin.H{"message": "User not found"})
-		})
 	}
 }
