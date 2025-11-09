@@ -1,17 +1,25 @@
 package request
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
-	"school-equipment-lending-system/database"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
+var db *gorm.DB
+
+func SetDB(database *gorm.DB) {
+	db = database
+}
+
 type Request struct {
-	RequestId   int    `json:"requestId"`
+	RequestId   int    `json:"requestId" gorm:"primaryKey;autoIncrement"`
 	UserId      int    `json:"userId"`
 	Name        string `json:"Username"`
 	EquipmentId int    `json:"equipmentId"`
 	Quantity    int    `json:"quantity"`
+	Status      string `json:"status"` // pending, approved, rejected, completed
 	CreatedAt   string `json:"createdAt"`
 	BorrowDate  string `json:"borrowDate"`
 	Remarks     string `json:"remarks"`
@@ -20,7 +28,7 @@ type Request struct {
 // GET all requests
 func GetAllRequests(c *gin.Context) {
 	var request []Request
-	if err := database.GetDB().Find(&request).Error; err != nil {
+	if err := db.Find(&request).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -31,11 +39,33 @@ func GetAllRequests(c *gin.Context) {
 func GetRequestByID(c *gin.Context) {
 	id := c.Param("id")
 	var request Request
-	if err := database.GetDB().First(&request, id).Error; err != nil {
+	if err := db.First(&request, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "request not found"})
 		return
 	}
 	c.JSON(http.StatusOK, request)
+}
+
+// GET requests by User ID
+func GetRequestsByUserID(c *gin.Context) {
+	userId := c.Param("userId")
+	var requests []Request
+	if err := db.Where("user_id = ?", userId).Find(&requests).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, requests)
+}
+
+// GET requests by Status
+func GetRequestsByStatus(c *gin.Context) {
+	status := c.Param("status")
+	var requests []Request
+	if err := db.Where("status = ?", status).Find(&requests).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, requests)
 }
 
 // POST new request
@@ -46,7 +76,7 @@ func CreateRequest(c *gin.Context) {
 		return
 	}
 
-	if err := database.GetDB().Create(&request).Error; err != nil {
+	if err := db.Create(&request).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -58,7 +88,6 @@ func UpdateRequest(c *gin.Context) {
 	id := c.Param("id")
 	var request Request
 
-	db := database.GetDB()
 	if err := db.First(&request, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Request not found"})
 		return
@@ -77,7 +106,6 @@ func UpdateRequest(c *gin.Context) {
 // DELETE request
 func DeleteRequest(c *gin.Context) {
 	id := c.Param("id")
-	db := database.GetDB()
 	if err := db.Delete(&Request{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -90,6 +118,8 @@ func RegisterRequestRoutes(r *gin.Engine) {
 	{
 		requestRoutes.GET("/", GetAllRequests)
 		requestRoutes.GET("/:id", GetRequestByID)
+		requestRoutes.GET("/user/:userId", GetRequestsByUserID)
+		requestRoutes.GET("/status/:status", GetRequestsByStatus)
 		requestRoutes.POST("/", CreateRequest)
 		requestRoutes.PUT("/:id", UpdateRequest)
 		requestRoutes.DELETE("/:id", DeleteRequest)

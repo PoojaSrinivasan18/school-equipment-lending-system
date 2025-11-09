@@ -1,10 +1,17 @@
 package equipment
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
-	"school-equipment-lending-system/database"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+var db *gorm.DB
+
+func SetDB(database *gorm.DB) {
+	db = database
+}
 
 type Equipment struct {
 	ID             int    `json:"id" gorm:"primaryKey;autoIncrement"`
@@ -20,7 +27,7 @@ type Equipment struct {
 // GET all equipments
 func GetAllEquipments(c *gin.Context) {
 	var equipments []Equipment
-	if err := database.GetDB().Find(&equipments).Error; err != nil {
+	if err := db.Find(&equipments).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -31,7 +38,7 @@ func GetAllEquipments(c *gin.Context) {
 func GetEquipmentByID(c *gin.Context) {
 	id := c.Param("id")
 	var equipment Equipment
-	if err := database.GetDB().First(&equipment, id).Error; err != nil {
+	if err := db.First(&equipment, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Equipment not found"})
 		return
 	}
@@ -46,7 +53,7 @@ func CreateEquipment(c *gin.Context) {
 		return
 	}
 
-	if err := database.GetDB().Create(&newEquipment).Error; err != nil {
+	if err := db.Create(&newEquipment).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -58,7 +65,6 @@ func UpdateEquipment(c *gin.Context) {
 	id := c.Param("id")
 	var equipment Equipment
 
-	db := database.GetDB()
 	if err := db.First(&equipment, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"message": "Equipment not found"})
 		return
@@ -77,7 +83,6 @@ func UpdateEquipment(c *gin.Context) {
 // DELETE equipment
 func DeleteEquipment(c *gin.Context) {
 	id := c.Param("id")
-	db := database.GetDB()
 	if err := db.Delete(&Equipment{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
