@@ -28,4 +28,5 @@ export interface RequestPayload {
   createdAt?: string
   borrowDate?: string
   remarks?: string
+  status?: string
 }

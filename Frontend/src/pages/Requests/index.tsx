@@ -1,143 +1,190 @@
 import React, { useEffect, useState } from 'react'
-import { createEquipment, deleteEquipment, updateEquipment, getAllEquipments } from '../../services/equipmentService'
-import type { Equipment } from '../../types/api'
+import {
+  getPendingRequests,
+  approveRequest,
+  rejectRequest,
+  getAllEquipments,
+  getMyRequests,
+  returnEquipment // 👈 new import
+} from '../../services/equipmentService'
+import type { RequestPayload, Equipment } from '../../types/api'
 import { useAuth } from '../../hooks/useAuth'
 
-export default function EditEquipmentsPage() {
+export default function AdminRequestsPage() {
   const { user } = useAuth()
-  const [items, setItems] = useState<Equipment[]>([])
+  const [requests, setRequests] = useState<RequestPayload[]>([])
+  const [equipments, setEquipments] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(false)
-
-  const [form, setForm] = useState({ name: '', category: '', totalStock: 1, description: '' })
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [actionLoading, setActionLoading] = useState<number | null>(null)
 
   useEffect(() => {
-    load()
-  }, [])
+    if (user) load()
+  }, [user])
 
   async function load() {
+    if (!user) return
     setLoading(true)
     try {
-      const data = await getAllEquipments()
-      setItems(data)
+      const [reqs, eqs] = await Promise.all([
+        user.role === 'admin' ? getPendingRequests() : getMyRequests(user.id),
+        getAllEquipments()
+      ])
+      setRequests(reqs)
+      setEquipments(eqs)
     } finally {
       setLoading(false)
     }
   }
 
-  async function onAdd(e: React.FormEvent) {
-    e.preventDefault()
+  function getEquipmentName(id: number): string {
+    const eq = equipments.find(e => e.id === id)
+    return eq ? eq.name : `Equipment #${id}`
+  }
+
+  async function handleApprove(id: number) {
+    setActionLoading(id)
     try {
-      const payload: Partial<Equipment> = {
-        name: form.name,
-        category: form.category,
-        totalStock: form.totalStock,
-        availableStock: form.totalStock,
-        description: form.description,
-      }
-      await createEquipment(payload)
-      setForm({ name: '', category: '', totalStock: 1, description: '' })
+      await approveRequest(id)
       await load()
     } catch (err) {
-      // ignore for now
       console.error(err)
+    } finally {
+      setActionLoading(null)
     }
   }
 
-  async function onDelete(id: number) {
-    if (!confirm('Delete this equipment?')) return
-    await deleteEquipment(id)
-    await load()
+  async function handleReject(id: number) {
+    setActionLoading(id)
+    try {
+      await rejectRequest(id)
+      await load()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  async function onSaveEdit(id: number, partial: Partial<Equipment>) {
-    await updateEquipment(id, partial)
-    setEditingId(null)
-    await load()
+  // 👇 new function for users to return approved equipment
+  async function handleReturn(id: number) {
+    setActionLoading(id)
+    try {
+      await returnEquipment(id)
+      await load()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  if (!user || user.role !== 'admin') {
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="card">
-          <h2 className="text-lg font-semibold">Not authorized</h2>
-          <div className="mt-2 text-sm text-gray-600">Requests page is for administrators only.</div>
+        <div className="card text-center">
+          <h2 className="text-lg font-semibold">Please log in</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            You must be logged in to view your requests.
+          </p>
         </div>
       </div>
     )
   }
 
+  const isAdmin = user.role === 'admin'
+  const title = isAdmin
+    ? 'Pending Equipment Requests'
+    : 'My Equipment Requests'
+
   return (
     <div className="min-h-screen">
       <div className="max-w-6xl mx-auto p-4">
-        <h2 className="text-2xl font-semibold mb-4">Edit Equipments</h2>
+        <h2 className="text-2xl font-semibold mb-4">{title}</h2>
 
-        <div className="card mb-4">
-          <form onSubmit={onAdd} className="space-y-3">
-            <div>
-              <label className="block text-sm mb-1">Name</label>
-              <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Category</label>
-              <input className="input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Total Stock</label>
-              <input type="number" min={0} className="input" value={form.totalStock} onChange={e => setForm(f => ({ ...f, totalStock: Number(e.target.value) }))} />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Description</label>
-              <textarea className="input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button type="submit" className="btn btn-primary">Add Equipment</button>
-            </div>
-          </form>
-        </div>
-
-        {loading ? <div>Loading...</div> : (
+        {loading ? (
+          <div>Loading requests...</div>
+        ) : requests.length === 0 ? (
+          <div className="text-gray-600 text-sm">
+            No {isAdmin ? 'pending' : 'submitted'} requests found.
+          </div>
+        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map(item => (
-              <div key={item.id} className="card">
-                {editingId === item.id ? (
-                  <EditItem item={item} onCancel={() => setEditingId(null)} onSave={(p) => onSaveEdit(item.id, p)} />
-                ) : (
-                  <div>
-                    <h3 className="font-semibold text-lg">{item.name}</h3>
-                    <div className="text-sm text-gray-600">{item.category}</div>
-                    <div className="mb-2 mt-2 text-sm">{item.description}</div>
-                    <div className="flex items-center justify-between">
-                      <div>Available: <strong>{item.availableStock}</strong></div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setEditingId(item.id)} className="px-3 py-1 border rounded">Edit</button>
-                        <button onClick={() => onDelete(item.id)} className="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
-                      </div>
-                    </div>
+            {requests.map(req => (
+              <div
+                key={req.requestId}
+                className="card flex flex-col justify-between"
+              >
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">{req.username}</h3>
+                  <div className="text-sm text-gray-600 mb-2">
+                    Requested:{' '}
+                    <strong>{getEquipmentName(req.equipmentId)}</strong>
+                  </div>
+                  <div className="text-sm mb-1">
+                    Quantity: <strong>{req.quantity}</strong>
+                  </div>
+                  <div className="text-sm mb-1">
+                    Borrow Date: <strong>{req.borrowDate}</strong>
+                  </div>
+                  <div className="text-sm mb-1">
+                    Remarks: {req.remarks || <em>None</em>}
+                  </div>
+                  <div className="text-sm mb-1">
+                    Status: <strong>{req.status}</strong>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2">
+                    Created at:{' '}
+                    {req.createdAt
+                      ? new Date(req.createdAt).toLocaleString()
+                      : 'N/A'}
+                  </div>
+                </div>
+
+                {/* --- ADMIN ACTIONS --- */}
+                {isAdmin && req.requestId !== undefined && (
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button
+                      onClick={() => handleApprove(req.requestId!)}
+                      disabled={actionLoading === req.requestId}
+                      className="btn btn-primary"
+                    >
+                      {actionLoading === req.requestId
+                        ? 'Approving...'
+                        : 'Approve'}
+                    </button>
+                    <button
+                      onClick={() => handleReject(req.requestId!)}
+                      disabled={actionLoading === req.requestId}
+                      className="btn bg-red-600 text-white"
+                    >
+                      {actionLoading === req.requestId
+                        ? 'Rejecting...'
+                        : 'Reject'}
+                    </button>
                   </div>
                 )}
+
+                {/* --- USER ACTIONS: RETURN EQUIPMENT --- */}
+                {!isAdmin &&
+                  req.requestId !== undefined &&
+                  req.status?.toUpperCase() === 'APPROVED' && (
+                    <div className="flex justify-end mt-4">
+                      <button
+                        onClick={() => handleReturn(req.requestId!)}
+                        disabled={actionLoading === req.requestId}
+                        className="btn bg-yellow-500 text-white"
+                      >
+                        {actionLoading === req.requestId
+                          ? 'Returning...'
+                          : 'Return Equipment'}
+                      </button>
+                    </div>
+                  )}
               </div>
             ))}
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-function EditItem({ item, onCancel, onSave }: { item: Equipment; onCancel: () => void; onSave: (p: Partial<Equipment>) => void }) {
-  const [state, setState] = useState<Partial<Equipment>>({ name: item.name, category: item.category, totalStock: item.totalStock, availableStock: item.availableStock, description: item.description })
-  return (
-    <form onSubmit={(e) => { e.preventDefault(); onSave(state) }} className="space-y-2">
-      <input className="input" value={state.name || ''} onChange={e => setState(s => ({ ...s, name: e.target.value }))} />
-      <input className="input" value={state.category || ''} onChange={e => setState(s => ({ ...s, category: e.target.value }))} />
-      <input type="number" className="input" value={state.totalStock ?? 0} onChange={e => setState(s => ({ ...s, totalStock: Number(e.target.value) }))} />
-      <input type="number" className="input" value={state.availableStock ?? 0} onChange={e => setState(s => ({ ...s, availableStock: Number(e.target.value) }))} />
-      <textarea className="input" value={state.description || ''} onChange={e => setState(s => ({ ...s, description: e.target.value }))} />
-      <div className="flex gap-2 justify-end">
-        <button type="button" onClick={onCancel} className="px-3 py-1 border rounded">Cancel</button>
-        <button type="submit" className="btn btn-primary">Save</button>
-      </div>
-    </form>
   )
 }

@@ -2,6 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import DarkModeToggle from './DarkModeToggle'
 import { useAuth } from '../hooks/useAuth'
+
 export default function NavBar() {
   const { user } = useAuth()
 
@@ -10,17 +11,80 @@ export default function NavBar() {
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="text-xl font-semibold text-brand-500">SchoolEQP</div>
+
           <nav className="hidden sm:flex items-center gap-2">
-            <NavLink to="/equipments" className={({ isActive }) => `px-3 py-1 rounded-md ${isActive ? 'bg-brand-500 text-white' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+            {/* Everyone can see Equipments */}
+            <NavLink
+              to="/equipments"
+              className={({ isActive }) =>
+                `px-3 py-1 rounded-md ${
+                  isActive
+                    ? 'bg-brand-500 text-white'
+                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`
+              }
+            >
               Equipments
             </NavLink>
-            {/* Requests (admin-only) */}
+
+            {/* Admin-only links */}
             {user?.role === 'admin' && (
-              <NavLink to="/edit-equipments" className={({ isActive }) => `px-3 py-1 rounded-md ${isActive ? 'bg-brand-500 text-white' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
-                Edit Equipments
+              <>
+                <NavLink
+                  to="/edit-equipments"
+                  className={({ isActive }) =>
+                    `px-3 py-1 rounded-md ${
+                      isActive
+                        ? 'bg-brand-500 text-white'
+                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`
+                  }
+                >
+                  Edit Equipments
+                </NavLink>
+
+                <NavLink
+                  to="/admin/requests"
+                  className={({ isActive }) =>
+                    `px-3 py-1 rounded-md ${
+                      isActive
+                        ? 'bg-brand-500 text-white'
+                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`
+                  }
+                >
+                  Pending Requests
+                </NavLink>
+              </>
+            )}
+
+            {/* Non-admin (user) link */}
+            {user && user.role !== 'admin' && (
+              <NavLink
+                to="/requests"
+                className={({ isActive }) =>
+                  `px-3 py-1 rounded-md ${
+                    isActive
+                      ? 'bg-brand-500 text-white'
+                      : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`
+                }
+              >
+                My Requests
               </NavLink>
             )}
-            <NavLink to="/profile" className={({ isActive }) => `px-3 py-1 rounded-md ${isActive ? 'bg-brand-500 text-white' : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+
+            {/* Common link */}
+            <NavLink
+              to="/profile"
+              className={({ isActive }) =>
+                `px-3 py-1 rounded-md ${
+                  isActive
+                    ? 'bg-brand-500 text-white'
+                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`
+              }
+            >
               Profile
             </NavLink>
           </nav>
@@ -36,4 +100,3 @@ export default function NavBar() {
     </header>
   )
 }
- 

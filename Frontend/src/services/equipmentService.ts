@@ -40,7 +40,7 @@ export async function createRequest(payload: RequestPayload): Promise<RequestPay
     const raw = localStorage.getItem(REQ_KEY)
     const arr: RequestPayload[] = raw ? JSON.parse(raw) : []
     const nextId = arr.length ? Math.max(...arr.map(r => r.requestId || 0)) + 1 : 1
-    const rec: RequestPayload = { ...payload, requestId: nextId, createdAt: new Date().toISOString() }
+    const rec: RequestPayload = { ...payload, requestId: nextId, createdAt: new Date().toISOString(), status: 'PENDING'}
     arr.push(rec)
     localStorage.setItem(REQ_KEY, JSON.stringify(arr))
 
@@ -66,7 +66,7 @@ export async function createRequest(payload: RequestPayload): Promise<RequestPay
 export async function getMyRequests(userId: number): Promise<RequestPayload[]> {
   const base = (import.meta as any).env?.VITE_API_BASE_URL
   if (base) {
-    const data = await apiGet<RequestPayload[]>('/requests', { params: { userId } })
+    const data = await apiGet<RequestPayload[]>('/requests/user', { params: { userId } })
     return data
   }
   try {
@@ -143,5 +143,129 @@ export async function updateEquipment(id: number, updated: Partial<Equipment>): 
     return merged
   } catch (e) {
     throw new Error('failed to update equipment')
+  }
+}
+
+// --- Admin: Get all pending requests ---
+export async function getPendingRequests(): Promise<RequestPayload[]> {
+  const base = (import.meta as any).env?.VITE_API_BASE_URL
+  if (base) {
+    // ✅ Updated to match backend route: GET /requests/status/pending
+    const data = await apiGet<RequestPayload[]>('/requests/status/pending')
+    return data
+  }
+
+  // Mock mode (localStorage)
+  try {
+    const raw = localStorage.getItem(REQ_KEY)
+    const arr: RequestPayload[] = raw ? JSON.parse(raw) : []
+    return arr.filter(r => (r.status || '').toLowerCase() === 'pending')
+  } catch {
+    return []
+  }
+}
+
+// --- Admin: Approve a request ---
+export async function approveRequest(requestId: number): Promise<RequestPayload> {
+  const base = (import.meta as any).env?.VITE_API_BASE_URL
+  if (base) {
+    // ✅ Updated to use POST /requests/:id/approve
+    const data = await apiPost<RequestPayload>(`/requests/${requestId}/approve`, {})
+    return data
+  }
+
+  // Mock mode
+  try {
+    const raw = localStorage.getItem(REQ_KEY)
+    const arr: RequestPayload[] = raw ? JSON.parse(raw) : []
+    const idx = arr.findIndex(r => r.requestId === requestId)
+    if (idx < 0) throw new Error('Request not found')
+
+    const req = arr[idx]
+    const now = new Date().toISOString()
+    const updated: RequestPayload = { ...req, status: 'approved' }
+    arr[idx] = updated
+    localStorage.setItem(REQ_KEY, JSON.stringify(arr))
+
+    // Decrement stock now (on approval)
+    try {
+      const eqRaw = localStorage.getItem(EQUIP_KEY)
+      if (eqRaw) {
+        const equips: Equipment[] = JSON.parse(eqRaw)
+        const eqIdx = equips.findIndex(e => e.id === req.equipmentId)
+        if (eqIdx >= 0) {
+          equips[eqIdx].availableStock = Math.max(0, equips[eqIdx].availableStock - req.quantity)
+          equips[eqIdx].updatedAt = now
+          localStorage.setItem(EQUIP_KEY, JSON.stringify(equips))
+        }
+      }
+    } catch {}
+    return updated
+  } catch {
+    throw new Error('failed to approve request')
+  }
+}
+
+// --- Admin: Reject a request ---
+export async function rejectRequest(requestId: number): Promise<RequestPayload> {
+  const base = (import.meta as any).env?.VITE_API_BASE_URL
+  if (base) {
+    // ✅ Updated to use POST /requests/:id/reject
+    const data = await apiPost<RequestPayload>(`/requests/${requestId}/reject`, {})
+    return data
+  }
+
+  // Mock mode
+  try {
+    const raw = localStorage.getItem(REQ_KEY)
+    const arr: RequestPayload[] = raw ? JSON.parse(raw) : []
+    const idx = arr.findIndex(r => r.requestId === requestId)
+    if (idx < 0) throw new Error('Request not found')
+
+    const req = arr[idx]
+    const updated: RequestPayload = { ...req, status: 'rejected' }
+    arr[idx] = updated
+    localStorage.setItem(REQ_KEY, JSON.stringify(arr))
+    return updated
+  } catch {
+    throw new Error('failed to reject request')
+  }
+}
+
+export async function returnEquipment(requestId: number): Promise<RequestPayload> {
+  const base = (import.meta as any).env?.VITE_API_BASE_URL
+  if (base) {
+    const data = await apiPost<RequestPayload>(`/requests/${requestId}/return`, {})
+    return data
+  }
+
+  // Mock mode
+  try {
+    const raw = localStorage.getItem(REQ_KEY)
+    const arr: RequestPayload[] = raw ? JSON.parse(raw) : []
+    const idx = arr.findIndex(r => r.requestId === requestId)
+    if (idx < 0) throw new Error('Request not found')
+
+    const req = arr[idx]
+    const now = new Date().toISOString()
+    const updated: RequestPayload = { ...req, status: 'completed' }
+    arr[idx] = updated
+    localStorage.setItem(REQ_KEY, JSON.stringify(arr))
+
+    // Increment stock back
+    const eqRaw = localStorage.getItem(EQUIP_KEY)
+    if (eqRaw) {
+      const equips: Equipment[] = JSON.parse(eqRaw)
+      const eqIdx = equips.findIndex(e => e.id === req.equipmentId)
+      if (eqIdx >= 0) {
+        equips[eqIdx].availableStock = equips[eqIdx].availableStock + req.quantity
+        equips[eqIdx].updatedAt = now
+        localStorage.setItem(EQUIP_KEY, JSON.stringify(equips))
+      }
+    }
+
+    return updated
+  } catch {
+    throw new Error('failed to return equipment')
   }
 }

@@ -32,6 +32,15 @@ export async function getUserById(id: number): Promise<User> {
       role: 'admin'
     }
   }
+  // 2nd demo user for prototyping
+  if (id === 3) {
+    return {
+      id: 3,
+      name: 'Second User',
+      email: 'second-user@gmail.com',
+      role: 'borrower'
+    }
+  }
   throw new Error('user not found')
 }
 

@@ -6,7 +6,8 @@ import OTPForm from './pages/Login/OTPForm'
 import ProfilePage from './pages/Profile'
 import NavBar from './components/NavBar'
 import EquipmentsPage from './pages/Equipments'
-import EditEquipmentsPage from './pages/Requests'
+import EditEquipmentsPage from './pages/EditEquipment'
+import AdminRequestsPage from './pages/Requests'
 import { useAuth } from './hooks/useAuth'
 
 const ProtectedRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
@@ -21,35 +22,59 @@ export default function App() {
       <NavBar />
       <main className="max-w-6xl mx-auto px-4 py-8">
         <Routes>
-      <Route path="/login" element={<LoginPage />}>
-        <Route index element={<LoginForm />} />
-        <Route path="verify" element={<OTPForm />} />
-      </Route>
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/equipments"
-        element={
-          <ProtectedRoute>
-            <EquipmentsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/edit-equipments"
-        element={
-          <ProtectedRoute>
-            <EditEquipmentsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage />}>
+            <Route index element={<LoginForm />} />
+            <Route path="verify" element={<OTPForm />} />
+          </Route>
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/equipments"
+            element={
+              <ProtectedRoute>
+                <EquipmentsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/edit-equipments"
+            element={
+              <ProtectedRoute>
+                <EditEquipmentsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ✅ Admin-only Requests page */}
+          <Route
+            path="/admin/requests"
+            element={
+              <ProtectedRoute>
+                <AdminRequestsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ✅ Regular user requests page */}
+          <Route
+            path="/requests"
+            element={
+              <ProtectedRoute>
+                <AdminRequestsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </main>
     </div>
