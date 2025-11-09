@@ -90,11 +90,34 @@ func DeleteEquipment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Equipment deleted"})
 }
 
+// GET equipment by category
+func GetEquipmentsByCategory(c *gin.Context) {
+	category := c.Param("category")
+	var equipments []Equipment
+	if err := db.Where("category = ?", category).Find(&equipments).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, equipments)
+}
+
+// GET all unique categories
+func GetEquipmentCategories(c *gin.Context) {
+	var categories []string
+	if err := db.Model(&Equipment{}).Distinct("category").Pluck("category", &categories).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"categories": categories})
+}
+
 // Register routes
 func RegisterEquipmentRoutes(r *gin.Engine) {
 	equipmentRoutes := r.Group("/equipments")
 	{
 		equipmentRoutes.GET("/", GetAllEquipments)
+		equipmentRoutes.GET("/categories", GetEquipmentCategories) // Move this before /:id
+		equipmentRoutes.GET("/category/:category", GetEquipmentsByCategory)
 		equipmentRoutes.GET("/:id", GetEquipmentByID)
 		equipmentRoutes.POST("/", CreateEquipment)
 		equipmentRoutes.PUT("/:id", UpdateEquipment)
